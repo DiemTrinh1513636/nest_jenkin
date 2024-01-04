@@ -21,8 +21,11 @@ pipeline {
         }
         stage('publish') {
             when {
-                expression {
-                    env.IMAGE_VERSION != ""
+                allOf {
+                    branch 'master'
+                    expression {
+                        env.IMAGE_VERSION != ""
+                    }
                 }
             }
             steps {
@@ -31,21 +34,23 @@ pipeline {
                 sh "docker build -t $IMAGE_NAME ."
                 sh "docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PWD"
                 sh "docker push $IMAGE_NAME"
-                script {publish_flag = true}
+                script { publish_flag = true }
             }
         }
         stage('deploy') {
-             when {
-                expression {
-                   publish_flag == true
+            when {
+                allOf {
+                    branch 'master'
+                    expression {
+                        publish_flag == true
+                    }
                 }
             }
             steps {
                 echo "Deploy: ssh to server, pull image and run container"
                 sshagent(credentials:['jenkin_user']){
-                    sh "ssh  $SSH_USER@$SSH_HOST 'docker images && docker pull $IMAGE_NAME && docker stop nest_jenkin_app || true && docker rm nest_jenkin_app || true && docker run --name nest_jenkin_app -p 3003:3000 -d $IMAGE_NAME'"
-              }
-                
+                    sh "ssh $SSH_USER@$SSH_HOST 'docker images && docker pull $IMAGE_NAME && docker stop nest_jenkin_app || true && docker rm nest_jenkin_app || true && docker run --name nest_jenkin_app -p 3003:3000 -d $IMAGE_NAME'"
+                }
             }
         }
     }
